@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mamá Hierro: aventura contra la anemia</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
+<style>
+:root{--bg:#e6f2fa;--fg:#14213d;--card:#fff;--rose:#e8456b;--leaf:#2f8f4e;--bar:#cfdbe6;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#10162a;--fg:#e8eefc;--card:#1c2440;--bar:#2c3558}}
+:root[data-theme="dark"]{--bg:#10162a;--fg:#e8eefc;--card:#1c2440;--bar:#2c3558}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:"Trebuchet MS",system-ui,sans-serif;display:flex;justify-content:center}
+#app{width:100%;max-width:820px;padding:10px}
+h1{font-family:"Press Start 2P",monospace;font-size:clamp(12px,3vw,17px);line-height:1.5;margin:6px 0 10px}
+#hud{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:8px;font-size:14px}
+#hb{font-family:"Press Start 2P",monospace;font-size:12px;color:var(--rose);min-width:120px}
+#barw{position:relative;flex:1;min-width:140px;height:16px;background:var(--bar);border-radius:8px;overflow:hidden}
+#bar{height:100%;width:0;background:var(--rose);transition:width .2s}
+#mark{position:absolute;top:0;bottom:0;width:3px;background:var(--fg)}
+#vc{font-size:13px;color:var(--leaf);min-width:140px;text-align:right}
+#stage{position:relative}
+canvas{width:100%;display:block;border-radius:10px;image-rendering:pixelated;background:#8ed1fc}
+#fact{position:absolute;left:8px;right:8px;bottom:8px;background:var(--card);color:var(--fg);border-left:6px solid var(--leaf);padding:9px 12px;border-radius:8px;font-size:14px;line-height:1.4;display:none}
+#ov{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:12px;background:rgba(10,16,40,.55);border-radius:10px}
+#card{background:var(--card);color:var(--fg);max-width:480px;padding:18px 20px;border-radius:12px;text-align:center;line-height:1.45;font-size:15px}
+#card h2{font-family:"Press Start 2P",monospace;font-size:14px;line-height:1.5;margin:0 0 10px}
+button{font:inherit;cursor:pointer}
+#go{margin-top:12px;background:var(--rose);color:#fff;border:0;border-radius:8px;padding:11px 22px;font-weight:700;font-size:16px}
+#go:focus-visible,.tb:focus-visible{outline:3px solid var(--fg);outline-offset:2px}
+#tc{display:flex;justify-content:space-between;margin-top:10px;gap:10px}
+.tb{flex:1;max-width:90px;height:56px;font-size:24px;border-radius:12px;border:2px solid var(--fg);background:var(--card);color:var(--fg);touch-action:none;user-select:none}
+.tb:active{background:var(--bar)}
+.sp{flex:1}
+small{display:block;margin-top:8px;opacity:.75;font-size:12px}
+</style>
+</head>
+<body>
+<div id="app">
+<h1>Mamá Hierro · <span id="lv">Nivel 1/10</span></h1>
+<div id="hud">
+<span id="hb"></span>
+<div id="barw"><div id="bar"></div><div id="mark"></div></div>
+<span id="vc"></span>
+</div>
+<div id="stage">
+<canvas id="c" width="640" height="360" aria-label="Juego de plataformas"></canvas>
+<div id="fact" role="status"></div>
+<div id="ov"><div id="card"></div></div>
+</div>
+<div id="tc">
+<button class="tb" id="bl" aria-label="Izquierda">◀</button>
+<button class="tb" id="br" aria-label="Derecha">▶</button>
+<span class="sp"></span>
+<button class="tb" id="bj" aria-label="Saltar">⬆</button>
+</div>
+<small>Teclado: flechas o A/D para moverte, espacio o ↑ para saltar. Juego educativo: no reemplaza la consulta con tu obstetra o médico.</small>
+</div>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d'),W=640,H=360;let END=3250,lvl=1,qn=1;
+const $=id=>document.getElementById(id);
+const FACTS=[
+"Se habla de anemia en el embarazo cuando la hemoglobina baja de 11 g/dL (a nivel del mar; en zonas de altura se ajusta según la altitud).",
+"El hierro de origen animal (sangrecita, hígado, bazo, carne roja) se absorbe mejor que el de lentejas, frijoles o espinaca.",
+"La vitamina C (naranja, limón, mandarina) ayuda a absorber el hierro. Acompaña tus comidas con limonada o fruta cítrica.",
+"El té, el café y las infusiones reducen la absorción del hierro. Evítalos junto con las comidas principales.",
+"Toma el suplemento de hierro y ácido fólico tal como te lo indique tu obstetra o médico, y acude a todos tus controles prenatales.",
+"La anemia puede causar cansancio, mareos y palidez, y aumenta el riesgo de parto prematuro y de bebé con bajo peso al nacer.",
+"Los lácteos y el calcio también reducen la absorción del hierro: sepáralos de tus comidas ricas en hierro y de tu suplemento.",
+"Las menestras (lentejas, frijoles) y las verduras de hoja verde aportan hierro; combínalas con carne o con vitamina C para aprovecharlo mejor.",
+"En el embarazo se necesita más hierro porque aumenta tu volumen de sangre y el bebé lo necesita para crecer y desarrollarse.",
+"La hemoglobina se mide con un análisis de sangre en tus controles prenatales: es la forma de saber si tienes anemia."
+];
+function rng(s){return()=>{s=Math.imul(s^s>>>15,s|1);s^=s+Math.imul(s^s>>>7,s|61);return((s^s>>>14)>>>0)/4294967296;};}
+const IRON=['🥩','🫘','🥬','🥚'],EM=['☕','🍵','🥤'];
+function build(n){
+ const r=rng(n*7919+13),d=(n-1)/9,G=[],P=[],Q=[],F=[],E=[],N=4+Math.round(d*8);
+ let x=0,fi=0,end=0;
+ for(let i=0;i<=N;i++){
+  const last=i==N,w=last?520:i==0?620:Math.round(360-d*100+r()*140);
+  G.push([x,w]);
+  if(i>0&&!last){
+   const lo=x+30,hi=x+w-70,c=(r()<.5+d*.4?1:0)+(d>.4&&r()<d?1:0)+(d>.75&&r()<.5?1:0),pw=(hi-lo)/Math.max(c,1);
+   for(let j=0;j<c;j++)E.push([lo+j*pw,lo+(j+1)*pw,EM[(i+j)%3],.9+d*1.4+r()*.4]);
+  }
+  for(let fx=x+(i?50:80);fx<x+w-(last?280:50);fx+=95)if(r()>d*.3)F.push([fx,262,fi++%5==3?'c':'i']);
+  if(i%2==1&&!last){const py=r()<.5?220:185,px=x+w*.5;P.push([px,py,96]);F.push([px+35,py-38,'i']);}
+  if(i==0)Q.push([200,210,(n*3)%FACTS.length]);
+  else if(i%3==2&&Q.length<3+Math.floor(d*3))Q.push([x+w*.2,200,(n*3+Q.length)%FACTS.length]);
+  if(last)end=x+250;else x+=w+(n<2?0:Math.round(55+d*38+r()*6));
+ }
+ return{G,P,Q,F,E,end};
+}
+let solids,foods,en,p,hb,boost,inv,cam,state='menu',fact=0,factT=0,seen,got;
+const keys={l:0,r:0,j:0};
+const hit=(a,b)=>a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;
+function reset(){
+ const L=build(lvl);END=L.end;qn=L.Q.length;
+ solids=L.G.map(([x,w])=>({x,y:300,w,h:60,g:1}));
+ L.P.forEach(([x,y,w])=>solids.push({x,y,w,h:16}));
+ L.Q.forEach(([x,y,q])=>solids.push({x,y,w:32,h:32,q,used:0}));
+ foods=L.F.map(([x,y,t],i)=>({x,y,w:26,h:26,c:t=='c',e:t=='c'?'🍊':IRON[i%4],ok:1}));
+ en=L.E.map(([a,b,e,sp])=>({x:a,y:272,w:28,h:28,a,b,d:1,e,sp,ok:1}));
+ p={x:40,y:200,w:24,h:30,vx:0,vy:0,on:0,f:1,t:0,cy:0,jb:0,jh:0,jmp:0};
+ hb=9-(lvl-1)*.09;boost=0;inv=0;cam=0;seen=0;got=0;
+ $('lv').textContent='Nivel '+lvl+'/10';
+ $('fact').style.display='none';factT=0;
+}
+function showFact(i){$('fact').textContent='💡 '+FACTS[i];$('fact').style.display='block';factT=420;}
+function overlay(t,m,b,fn){$('card').innerHTML='<h2>'+t+'</h2><div>'+m+'</div><button id="go">'+b+'</button>';$('ov').style.display='flex';$('go').onclick=fn||start;$('go').focus();state='menu';}
+function start(){reset();$('ov').style.display='none';state='play';}
+function lose(msg){overlay('¡Otra vez!',msg,'Reintentar');}
+function bump(s){if(s.q!==undefined&&!s.used){s.used=1;seen++;showFact(s.q);}}
+function step(){
+ p.vx=(keys.r-keys.l)*3.2;
+ if(p.vx)p.f=p.vx>0?1:-1;
+ if(keys.j&&!p.jh)p.jb=7;else if(p.jb>0)p.jb--;
+ p.jh=keys.j;
+ if(p.on)p.cy=6;else if(p.cy>0)p.cy--;
+ if(p.jb>0&&p.cy>0){p.vy=-11;p.on=0;p.cy=0;p.jb=0;p.jmp=1;}
+ if(!keys.j&&p.jmp&&p.vy<-4)p.vy=-4;
+ p.vy=Math.min(p.vy+.55,12);
+ p.x+=p.vx;if(p.x<0)p.x=0;
+ for(const s of solids)if(hit(p,s)){if(p.vx>0)p.x=s.x-p.w;else if(p.vx<0)p.x=s.x+s.w;}
+ p.y+=p.vy;p.on=0;
+ for(const s of solids)if(hit(p,s)){
+  if(p.vy>0){p.y=s.y-p.h;p.on=1;p.jmp=0;}
+  else if(p.vy<0){p.y=s.y+s.h;bump(s);}
+  p.vy=0;
+ }
+ if(p.y>H+60){lose('Caíste al vacío. Salta antes del borde.');return;}
+ if(boost>0)boost--;
+ if(inv>0)inv--;
+ hb-=(lvl-1)*.00002;
+ for(const f of foods)if(f.ok&&hit(p,f)){
+  f.ok=0;
+  if(f.c){boost=480;}else{hb=Math.min(14,hb+(boost>0?.5:.3));got++;}
+ }
+ for(const e of en)if(e.ok){
+  e.x+=e.d*e.sp;if(e.x<e.a)e.d=1;if(e.x>e.b)e.d=-1;
+  if(hit(p,e)){
+   if(p.vy>0&&p.y+p.h-p.vy<=e.y+10){e.ok=0;p.vy=-8;p.jmp=0;}
+   else if(inv<=0){hb-=.4;inv=90;p.vy=-6;p.x+=p.x<e.x?-24:24;showFact(3);}
+  }
+ }
+ if(hb<7.5){lose('Tu hemoglobina bajó demasiado. Evita té, café y gaseosas, o aplástalos saltando encima.');return;}
+ if(p.x>END){
+  const v=hb.toFixed(1);
+  if(hb>=11){const m='Hemoglobina final: <b>'+v+' g/dL</b>, por encima de 11.<br>Comer alimentos con hierro, tomar tu suplemento y asistir a tus controles te protege a ti y a tu bebé.';
+   if(lvl<10)overlay('¡Nivel '+lvl+' superado!',m,'Ir al nivel '+(lvl+1),()=>{lvl++;start();});
+   else overlay('¡Completaste los 10 niveles!',m+'<br>¡Ya sabes cómo ganarle a la anemia!','Jugar de nuevo',()=>{lvl=1;start();});}
+  else lose('Llegaste con hemoglobina de <b>'+v+' g/dL</b>, aún bajo 11. Recoge más alimentos con hierro y toma naranja antes.');
+ }
+ cam=Math.max(0,Math.min(p.x-220,END+120-W));
+}
+function txt(s,x,y,sz){X.font=sz+'px serif';X.fillText(s,x,y);}
+function drawP(){
+ p.t+=p.on?Math.abs(p.vx)*.14:0;
+ const sw=p.on&&p.vx?Math.sin(p.t)*4:0,air=!p.on,bob=p.on&&p.vx?Math.abs(Math.sin(p.t))*1.5:0;
+ X.save();X.translate(p.x+12,p.y-bob);X.scale(p.f,1);
+ if(boost>0){X.fillStyle='rgba(255,170,0,.35)';X.beginPath();X.arc(0,16,22,0,7);X.fill();}
+ X.fillStyle='#3b2416';X.fillRect(-9,3,4,12);
+ X.fillStyle='#5b3a29';
+ X.fillRect(air?-7:-6+sw,24,5,6);X.fillRect(air?3:1-sw,air?23:24,5,air?5:6);
+ X.fillStyle='#c0392b';X.fillRect(air?-8:-7+sw,28,7,2);X.fillRect(air?3:0-sw,28,7,2);
+ X.fillStyle='#2a9d8f';X.beginPath();X.ellipse(0,18,9,9,0,0,7);X.fill();
+ X.fillStyle='#e8456b';X.beginPath();X.arc(5,20,7,0,7);X.fill();
+ X.fillStyle='#fff';X.beginPath();X.arc(5,19,2,0,7);X.fill();
+ X.fillStyle='#f1c27d';X.fillRect(-1,12,3,8);
+ if(air)X.fillRect(-1,8,3,5);
+ X.beginPath();X.arc(0,6,6,0,7);X.fill();
+ X.fillStyle='#3b2416';X.beginPath();X.arc(0,5,6.5,Math.PI,0);X.fill();
+ X.fillStyle='#fff';X.fillRect(-6,3,12,2);
+ X.fillStyle='#222';X.fillRect(3,6,2,2);
+ X.fillStyle='#d9534f';X.fillRect(2,10,3,1);
+ X.restore();
+}
+function draw(){
+ X.fillStyle='#8ed1fc';X.fillRect(0,0,W,H);
+ X.fillStyle='rgba(255,255,255,.8)';
+ for(let i=0;i<9;i++){const cx=(i*420-cam*.4)%(W+300);txt('☁️',cx<-60?cx+W+300:cx,60+(i%3)*35,36);}
+ X.save();X.translate(-Math.round(cam),0);
+ for(const s of solids){
+  if(s.g){X.fillStyle='#8a5a2b';X.fillRect(s.x,s.y,s.w,s.h);X.fillStyle='#3fae5a';X.fillRect(s.x,s.y,s.w,8);}
+  else if(s.q!==undefined){X.fillStyle=s.used?'#9a9a9a':'#f4b400';X.fillRect(s.x,s.y,32,32);X.strokeStyle='#7a5200';X.lineWidth=2;X.strokeRect(s.x+1,s.y+1,30,30);
+   X.fillStyle='#fff';X.font='bold 20px sans-serif';X.fillText(s.used?'✓':'?',s.x+10,s.y+23);}
+  else{X.fillStyle='#b5651d';X.fillRect(s.x,s.y,s.w,s.h);X.fillStyle='#d08a45';X.fillRect(s.x,s.y,s.w,4);}
+ }
+ for(const f of foods)if(f.ok)txt(f.e,f.x,f.y+22,24);
+ for(const e of en)if(e.ok)txt(e.e,e.x,e.y+26,26);
+ txt('🏥',END+20,296,48);
+ if(!(inv>0&&Math.floor(inv/6)%2))drawP();
+ X.restore();
+ const pc=Math.max(0,Math.min(1,(hb-7)/7));
+ $('bar').style.width=pc*100+'%';
+ $('mark').style.left=((11-7)/7*100)+'%';
+ $('hb').textContent='Hb '+hb.toFixed(1);
+ $('vc').textContent=boost>0?'🍊 Vitamina C activa: el hierro rinde más':'Alimentos: '+got+'  Datos: '+seen+'/'+qn;
+ if(factT>0){factT--;if(!factT)$('fact').style.display='none';}
+}
+let last=0,acc=0;
+function loop(t){
+ acc+=Math.min(50,t-last);last=t;
+ while(acc>16.67){if(state==='play')step();acc-=16.67;}
+ if(solids)draw();
+ requestAnimationFrame(loop);
+}
+const KM={ArrowLeft:'l',a:'l',A:'l',ArrowRight:'r',d:'r',D:'r',ArrowUp:'j',w:'j',W:'j',' ':'j'};
+addEventListener('keydown',e=>{const k=KM[e.key];if(k){keys[k]=1;if(state==='play')e.preventDefault();}});
+addEventListener('keyup',e=>{const k=KM[e.key];if(k)keys[k]=0;});
+[['bl','l'],['br','r'],['bj','j']].forEach(([id,k])=>{
+ const b=$(id);
+ b.addEventListener('pointerdown',e=>{e.preventDefault();keys[k]=1;});
+ ['pointerup','pointerleave','pointercancel'].forEach(ev=>b.addEventListener(ev,()=>keys[k]=0));
+});
+reset();
+$('card').innerHTML='<h2>Mamá Hierro</h2><div>Hay <b>10 niveles</b>, de fácil a difícil. Tu hemoglobina empieza cerca de <b>9 g/dL</b>. Llega al centro de salud 🏥 con <b>11 o más</b>.<br><br>🥩🫘🥬🥚 suben tu hemoglobina<br>🍊 hace que el hierro rinda más<br>☕🍵🥤 la bajan: aplástalos saltando encima<br>Golpea los bloques <b>?</b> desde abajo para aprender.</div><button id="go">Empezar</button>';
+$('go').onclick=start;
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
